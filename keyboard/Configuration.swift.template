@@ -1,0 +1,6 @@
+import Foundation
+
+struct Configuration {
+    // Replace with your OpenAI API key
+    static let openAIKey = "your_api_key_here"
+}
