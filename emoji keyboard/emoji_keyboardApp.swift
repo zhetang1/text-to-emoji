@@ -9,6 +9,15 @@ import SwiftUI
 
 @main
 struct emoji_keyboardApp: App {
+    init() {
+        #if DEBUG
+        // Only generate icon in debug builds
+        Task {
+            await AppIconGenerator.generateIcon()
+        }
+        #endif
+    }
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
