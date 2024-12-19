@@ -14,14 +14,15 @@ class KeyboardViewController: UIInputViewController {
     @IBOutlet var nextKeyboardButton: UIButton!
     private var keyboardView: UIView!
     private var displayLabel: UILabel!
-    private let openAIKey = ProcessInfo.processInfo.environment["OPENAI_API_KEY"] ?? ""
+    private var emojiLabel: UILabel!
+    private let openAIKey = ""
     private var typedText: String = "" {
         didSet {
             DispatchQueue.main.async {
                 self.displayLabel.text = self.typedText
                 self.processText(self.typedText) { processedText in
                     DispatchQueue.main.async {
-                        self.displayLabel.text = processedText
+                        self.emojiLabel.text = processedText
                     }
                 }
             }
@@ -29,12 +30,13 @@ class KeyboardViewController: UIInputViewController {
     }
     private var keys: [[String]] = [
         ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
-        ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
-        ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
-        ["⇧", "Z", "X", "C", "V", "B", "N", "M", "⌫"],
+        ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
+        ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
+        ["⇧", "z", "x", "c", "v", "b", "n", "m", "⌫"],
         ["space"]
         // ["123", "next", "space", "return"]
     ]
+    private var isShiftEnabled = false
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -54,22 +56,34 @@ class KeyboardViewController: UIInputViewController {
     private func setupKeyboardView() {
         keyboardView = UIView(frame: .zero)
         keyboardView.translatesAutoresizingMaskIntoConstraints = false
-        keyboardView.backgroundColor = .systemGray6
+        keyboardView.backgroundColor = UIColor(red: 209/255, green: 213/255, blue: 219/255, alpha: 1.0)  // iOS keyboard background color
         view.addSubview(keyboardView)
+        
+        emojiLabel = UILabel()
+        emojiLabel.translatesAutoresizingMaskIntoConstraints = false
+        emojiLabel.backgroundColor = .clear
+        emojiLabel.textAlignment = .left
+        emojiLabel.font = .systemFont(ofSize: 16)
+        emojiLabel.textColor = .black
+        emojiLabel.text = ""
+        emojiLabel.isUserInteractionEnabled = true
+        keyboardView.addSubview(emojiLabel)
         
         displayLabel = UILabel()
         displayLabel.translatesAutoresizingMaskIntoConstraints = false
-        displayLabel.backgroundColor = .white
+        displayLabel.backgroundColor = .clear
         displayLabel.textAlignment = .left
         displayLabel.font = .systemFont(ofSize: 16)
+        displayLabel.textColor = .black
         displayLabel.text = typedText
-        displayLabel.layer.cornerRadius = 5
-        displayLabel.layer.masksToBounds = true
         displayLabel.isUserInteractionEnabled = true
         keyboardView.addSubview(displayLabel)
         
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(displayLabelTapped))
         displayLabel.addGestureRecognizer(tapGesture)
+        
+        let emojiTapGesture = UITapGestureRecognizer(target: self, action: #selector(emojiLabelTapped))
+        emojiLabel.addGestureRecognizer(emojiTapGesture)
         
         NSLayoutConstraint.activate([
             keyboardView.leftAnchor.constraint(equalTo: view.leftAnchor),
@@ -77,7 +91,12 @@ class KeyboardViewController: UIInputViewController {
             keyboardView.topAnchor.constraint(equalTo: view.topAnchor),
             keyboardView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
-            displayLabel.topAnchor.constraint(equalTo: keyboardView.topAnchor, constant: 5),
+            emojiLabel.topAnchor.constraint(equalTo: keyboardView.topAnchor, constant: 5),
+            emojiLabel.leftAnchor.constraint(equalTo: keyboardView.leftAnchor, constant: 10),
+            emojiLabel.rightAnchor.constraint(equalTo: keyboardView.rightAnchor, constant: -10),
+            emojiLabel.heightAnchor.constraint(equalToConstant: 30),
+            
+            displayLabel.topAnchor.constraint(equalTo: emojiLabel.bottomAnchor, constant: 5),
             displayLabel.leftAnchor.constraint(equalTo: keyboardView.leftAnchor, constant: 10),
             displayLabel.rightAnchor.constraint(equalTo: keyboardView.rightAnchor, constant: -10),
             displayLabel.heightAnchor.constraint(equalToConstant: 30)
@@ -93,69 +112,88 @@ class KeyboardViewController: UIInputViewController {
     }
     
     private func createKeys() {
-        let buttonHeight: CGFloat = 40
-        let buttonSpacing: CGFloat = 5
+        let buttonHeight: CGFloat = 30
+        let buttonSpacing: CGFloat = 3
         let sideInset: CGFloat = 3
         
-        // Calculate keyboard height
-        let keyboardHeight: CGFloat = CGFloat(keys.count) * (buttonHeight + buttonSpacing) + 40 // Extra height for display label
+        // Calculate total keyboard height needed
+        let totalRows = CGFloat(keys.count)
+        let totalSpacing = (totalRows - 1) * buttonSpacing
+        let labelsHeight: CGFloat = 70
+        let keyboardHeight = (buttonHeight * totalRows) + totalSpacing + labelsHeight
         
-        // Set keyboard height constraint
-        NSLayoutConstraint.activate([
-            keyboardView.heightAnchor.constraint(equalToConstant: keyboardHeight)
-        ])
+        keyboardView.heightAnchor.constraint(equalToConstant: keyboardHeight).isActive = true
         
         for (rowIndex, row) in keys.enumerated() {
             let rowView = UIView()
             rowView.translatesAutoresizingMaskIntoConstraints = false
-            rowView.backgroundColor = .systemGray6 // Debug color
+            rowView.backgroundColor = .clear
             keyboardView.addSubview(rowView)
             
             NSLayoutConstraint.activate([
                 rowView.leftAnchor.constraint(equalTo: keyboardView.leftAnchor, constant: sideInset),
                 rowView.rightAnchor.constraint(equalTo: keyboardView.rightAnchor, constant: -sideInset),
-                rowView.topAnchor.constraint(equalTo: displayLabel.bottomAnchor, constant: CGFloat(rowIndex) * (buttonHeight + buttonSpacing) + 5),
+                rowView.topAnchor.constraint(equalTo: displayLabel.bottomAnchor, constant: CGFloat(rowIndex) * (buttonHeight + buttonSpacing) + 2),
                 rowView.heightAnchor.constraint(equalToConstant: buttonHeight)
             ])
             
-            // Calculate total width units for the row
-            let totalUnits = row.reduce(0) { total, key in
-                switch key {
-                case "space": return total + 4
-                case "return", "123", "next": return total + 2
-                default: return total + 1
-                }
-            }
+            let buttonWidth = (UIScreen.main.bounds.width - (CGFloat(row.count + 1) * buttonSpacing)) / CGFloat(row.count)
             
-            // Keep track of used width
-            var currentX: CGFloat = 0
-            let availableWidth = UIScreen.main.bounds.width - (2 * sideInset)
-            let unitWidth = (availableWidth - (CGFloat(row.count - 1) * buttonSpacing)) / CGFloat(totalUnits)
-            
-            for key in row {
-                let button = createButton(withTitle: key)
-                rowView.addSubview(button)
+            for (columnIndex, key) in row.enumerated() {
+                let button = UIButton(type: .system)
                 button.translatesAutoresizingMaskIntoConstraints = false
                 
-                // Calculate button width
-                let units = {
-                    switch key {
-                    case "space": return 4
-                    case "return", "123", "next": return 2
-                    default: return 1
+                // Set button appearance based on key type
+                if key == "space" {
+                    button.setTitle("space", for: .normal)
+                    button.backgroundColor = .white
+                } else if key == "⌫" {
+                    button.setTitle("⌫", for: .normal)
+                    button.backgroundColor = UIColor(red: 172/255, green: 179/255, blue: 188/255, alpha: 1.0)  // Delete key color
+                    button.titleLabel?.font = .systemFont(ofSize: 20)  // Larger font for the delete symbol
+                } else if key == "⇧" {
+                    button.setTitle("⇧", for: .normal)
+                    button.backgroundColor = UIColor(red: 172/255, green: 179/255, blue: 188/255, alpha: 1.0)
+                    if isShiftEnabled {
+                        button.backgroundColor = .white
                     }
-                }()
+                } else {
+                    let displayKey = isShiftEnabled ? key.uppercased() : key
+                    button.setTitle(displayKey, for: .normal)
+                    button.backgroundColor = .white
+                }
                 
-                let buttonWidth = unitWidth * CGFloat(units)
+                // Common button styling
+                button.setTitleColor(.black, for: .normal)
+                button.titleLabel?.font = .systemFont(ofSize: 15)
+                button.layer.cornerRadius = 5
+                button.layer.shadowColor = UIColor.black.cgColor
+                button.layer.shadowOffset = CGSize(width: 0, height: 1)
+                button.layer.shadowOpacity = 0.2
+                button.layer.shadowRadius = 0
                 
-                NSLayoutConstraint.activate([
-                    button.leftAnchor.constraint(equalTo: rowView.leftAnchor, constant: currentX),
-                    button.topAnchor.constraint(equalTo: rowView.topAnchor),
-                    button.bottomAnchor.constraint(equalTo: rowView.bottomAnchor),
-                    button.widthAnchor.constraint(equalToConstant: buttonWidth)
-                ])
+                rowView.addSubview(button)
                 
-                currentX += buttonWidth + buttonSpacing
+                let buttonConstraints: [NSLayoutConstraint]
+                if key == "space" {
+                    // Make space bar wider
+                    buttonConstraints = [
+                        button.leftAnchor.constraint(equalTo: rowView.leftAnchor, constant: buttonWidth * 0.2),
+                        button.rightAnchor.constraint(equalTo: rowView.rightAnchor, constant: -buttonWidth * 0.2),
+                        button.topAnchor.constraint(equalTo: rowView.topAnchor),
+                        button.bottomAnchor.constraint(equalTo: rowView.bottomAnchor)
+                    ]
+                } else {
+                    buttonConstraints = [
+                        button.leftAnchor.constraint(equalTo: rowView.leftAnchor, constant: CGFloat(columnIndex) * (buttonWidth + buttonSpacing)),
+                        button.widthAnchor.constraint(equalToConstant: buttonWidth),
+                        button.topAnchor.constraint(equalTo: rowView.topAnchor),
+                        button.bottomAnchor.constraint(equalTo: rowView.bottomAnchor)
+                    ]
+                }
+                NSLayoutConstraint.activate(buttonConstraints)
+                
+                button.addTarget(self, action: #selector(keyPressed(_:)), for: .touchUpInside)
             }
         }
     }
@@ -191,8 +229,21 @@ class KeyboardViewController: UIInputViewController {
             // Handle number pad (not implemented)
             break
         case "⇧":
-            // Handle shift (not implemented)
-            break
+            isShiftEnabled.toggle()
+            // Refresh all letter keys
+            for view in keyboardView.subviews {
+                if let rowView = view as? UIView {
+                    for case let button as UIButton in rowView.subviews {
+                        if let title = button.title(for: .normal),
+                           title != "⌫" && title != "space" && title != "⇧" {
+                            button.setTitle(isShiftEnabled ? title.uppercased() : title.lowercased(), for: .normal)
+                        }
+                        if button.title(for: .normal) == "⇧" {
+                            button.backgroundColor = isShiftEnabled ? .white : UIColor(red: 172/255, green: 179/255, blue: 188/255, alpha: 1.0)
+                        }
+                    }
+                }
+            }
         default:
             typedText += key
         }
@@ -201,6 +252,12 @@ class KeyboardViewController: UIInputViewController {
     @objc private func displayLabelTapped() {
         guard !typedText.isEmpty else { return }
         textDocumentProxy.insertText(displayLabel.text ?? "")
+        typedText = ""
+    }
+    
+    @objc private func emojiLabelTapped() {
+        guard let emojiText = emojiLabel.text, !emojiText.isEmpty else { return }
+        textDocumentProxy.insertText(emojiText)
         typedText = ""
     }
     
